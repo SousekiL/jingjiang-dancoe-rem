@@ -13,16 +13,16 @@ import geopandas as gpd
 
 warnings.filterwarnings('ignore')
 
-BASE   = os.path.dirname(os.path.abspath(__file__))
-DEM    = os.path.join(BASE, "data/dem_proj.tif")
-REM    = os.path.join(BASE, "output/rem_gdal.tif")
-R_SURF = os.path.join(BASE, "output/river_surface.tif")
-HS     = os.path.join(BASE, "output/hillshade.tif")
-PTS    = os.path.join(BASE, "output/river_pts.shp")
-PNG    = os.path.join(BASE, "output/jingjiang_blue.png")
-TIF    = os.path.join(BASE, "output/jingjiang_blue.tif")
+ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEM    = os.path.join(ROOT, "data/dem_proj.tif")
+REM    = os.path.join(ROOT, "output/rem_gdal.tif")
+R_SURF = os.path.join(ROOT, "output/river_surface.tif")
+HS     = os.path.join(ROOT, "output/hillshade.tif")
+PTS    = os.path.join(ROOT, "output/river_pts.shp")
+PNG    = os.path.join(ROOT, "output/jingjiang_blue.png")
+TIF    = os.path.join(ROOT, "output/jingjiang_blue.tif")
 
-os.makedirs(os.path.join(BASE, "output"), exist_ok=True)
+os.makedirs(os.path.join(ROOT, "output"), exist_ok=True)
 
 # ═══════════════════════════════════════════════════════
 #  Step 1: OSM → 完整长江中心线

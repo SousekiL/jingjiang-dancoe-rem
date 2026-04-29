@@ -19,6 +19,7 @@ from PIL import Image, ImageFilter, ImageEnhance
 import rasterio
 from rasterio.transform import from_bounds
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import *
 
 warnings.filterwarnings('ignore')

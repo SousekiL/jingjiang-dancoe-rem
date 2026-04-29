@@ -22,8 +22,8 @@ import argparse
 import subprocess
 
 COMMANDS = [
-    ("步骤 1/3: DEM 预处理", ["python", "01_download_dem.py"]),
-    ("步骤 2/3: REM 生成", ["python", "02_make_rem.py"]),
+    ("步骤 1/3: DEM 预处理", ["python", "src/01_download_dem.py"]),
+    ("步骤 2/3: REM 生成", ["python", "src/02_make_rem.py"]),
 ]
 
 
@@ -50,7 +50,7 @@ def main():
         run_step(label, cmd)
 
     # 步骤3 传入配色参数
-    viz_cmd = ["python", "03_visualize_dancoe.py", "--cmap", args.cmap]
+    viz_cmd = ["python", "src/03_visualize_dancoe.py", "--cmap", args.cmap]
     run_step("步骤 3/3: Dan Coe 风格可视化", viz_cmd)
 
     print("\n" + "=" * 70)

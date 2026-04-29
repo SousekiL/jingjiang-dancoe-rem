@@ -29,26 +29,26 @@ Log into [Geospatial Data Cloud (gscloud.cn)](https://www.gscloud.cn), download 
 ### 3. Run the pipeline
 
 ```bash
-python 01_download_dem.py        # Merge 6 tiles → UTM Zone 49N projection
-python 02_make_rem.py            # OSM Yangtze centerline → IDW interpolation → REM
-python 03_visualize_dancoe.py    # Dan Coe-style rendering
+python src/01_download_dem.py        # Merge 6 tiles → UTM Zone 49N projection
+python src/02_make_rem.py            # OSM Yangtze centerline → IDW interpolation → REM
+python src/03_visualize_dancoe.py    # Dan Coe-style rendering
 ```
 
 Or use the **experimental script** (GDAL `gdal_grid` IDW, potentially more accurate):
 
 ```bash
 conda create -n rem_env riverrem -c conda-forge -y
-conda run -n rem_env python generate_jingjiang.py
+conda run -n rem_env python src/generate_jingjiang.py
 ```
 
 ### 4. Switch color schemes
 
 ```bash
-python 03_visualize_dancoe.py --cmap magenta_glow   # Magenta glow
-python 03_visualize_dancoe.py --cmap gold_ember     # Gold ember
-python 03_visualize_dancoe.py --cmap cyan_neon      # Cyan neon
-python 03_visualize_dancoe.py --cmap ocean_depth    # Ocean depth
-python 03_visualize_dancoe.py --cmap volcanic_red   # Volcanic red
+python src/03_visualize_dancoe.py --cmap magenta_glow   # Magenta glow
+python src/03_visualize_dancoe.py --cmap gold_ember     # Gold ember
+python src/03_visualize_dancoe.py --cmap cyan_neon      # Cyan neon
+python src/03_visualize_dancoe.py --cmap ocean_depth    # Ocean depth
+python src/03_visualize_dancoe.py --cmap volcanic_red   # Volcanic red
 ```
 
 ---
@@ -58,10 +58,13 @@ python 03_visualize_dancoe.py --cmap volcanic_red   # Volcanic red
 ```
 jingjiang-dancoe-rem/
 ├── config.py                 # 🔧 All tunable parameters (bbox, sampling, IDW, colormaps)
-├── 01_download_dem.py        # Step 1: Merge ASTER tiles + crop + reproject to UTM 49N
-├── 02_make_rem.py            # Step 2: OSM Yangtze centerline + KDTree IDW + REM
-├── 03_visualize_dancoe.py    # Step 3: 6 color schemes + Hillshade + vignette post-processing
-├── generate_jingjiang.py     # [Experimental] gdal_grid IDW high-precision version
+├── src/
+│   ├── 01_download_dem.py    # Step 1: Merge ASTER tiles + crop + reproject to UTM 49N
+│   ├── 02_make_rem.py        # Step 2: OSM Yangtze centerline + KDTree IDW + REM
+│   ├── 03_visualize_dancoe.py# Step 3: 6 color schemes + Hillshade + vignette post-processing
+│   ├── generate_jingjiang.py # [Experimental] gdal_grid IDW high-precision version
+│   ├── run_all.py            # One-shot pipeline runner
+│   └── step2_rem.py          # RiverREM wrapper
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This document
 ├── TUTORIAL.md               # 📖 Full Chinese walkthrough (data download, tuning, troubleshooting)

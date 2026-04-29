@@ -31,6 +31,7 @@ from shapely.geometry import box, LineString, MultiLineString, Point
 from shapely.ops import linemerge
 import geopandas as gpd
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import *
 
 warnings.filterwarnings('ignore', category=FutureWarning)
