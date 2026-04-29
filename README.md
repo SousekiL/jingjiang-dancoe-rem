@@ -1,22 +1,18 @@
-# 🌊 荆江段 Dan Coe 风格 REM (Relative Elevation Model) 自动生成
+# 🌊 Jingjiang Dan Coe-Style REM (Relative Elevation Model)
 
-**纯 Python 全自动流程，无需 QGIS，从公开 DEM 数据直接生成 Dan Coe 经典风格的发光河流可视化。**
+**A fully automated Python pipeline — no QGIS required — that generates Dan Coe's iconic luminous river visualizations from publicly available DEM tiles.**
 
-聚焦长江荆江段（湖北枝江 → 湖南城陵矶），展现"九曲回肠"的千年古河道、牛轭湖、天然堤遗迹。
-
-![原理示意](TUTORIAL.md) <!-- 教程中有详细图解 -->
-
-> 🎨 **效果预览**：黑色背景中，电光蓝色的河流脉络从黑暗中浮现，两侧的废弃古河道、河漫滩纹理宛如发光的神经脉络。
+Targets the Jingjiang section of China's Yangtze River (Zhicheng → Chenglingji), revealing millennia of meander migration, oxbow lakes, and ancient channel scars. Electric-blue river channels emerge from a deep black background like glowing neural pathways through time.
 
 ---
 
-## ⚡ 快速开始 (三步)
+## ⚡ Quick Start
 
-### 前提
-- Python 3.9+
-- GDAL (>=3.0) 已安装 (macOS: `brew install gdal` / Ubuntu: `sudo apt install gdal-bin`)
+### Prerequisites
+- Python ≥3.9 (conda recommended)
+- **GDAL ≥3.0** (system-level): macOS `brew install gdal` / Ubuntu `sudo apt install gdal-bin`
 
-### 1. 安装依赖
+### 1. Create environment
 
 ```bash
 conda create -n jingjiang python=3.11 -y
@@ -24,88 +20,140 @@ conda activate jingjiang
 pip install -r requirements.txt
 ```
 
-### 2. 获取 DEM 数据
+### 2. Obtain DEM data
 
-**推荐**：登录 [地理空间数据云](https://www.gscloud.cn)，搜索 `ASTER GDEM 30M`，框选荆江区域 (111.0-113.5°E, 29.0-30.5°N)，下载 `.tif` 后放入本项目的 `data/` 目录。
+Log into [Geospatial Data Cloud (gscloud.cn)](https://www.gscloud.cn), download **ASTER GDEM 30M** tiles covering the Jingjiang reach (111.0°–113.5°E, 29.0°–30.5°N). Six `.img` rasters are required, placed into the `data/` directory.
 
-### 3. 运行全流程
+> Tile list: `ASTGTM_N29E111L.img`, `N29E112W`, `N29E113L`, `N30E111I`, `N30E112B`, `N30E113T`.
 
-```bash
-# 步骤1: DEM 裁剪 + 投影
-python 01_download_dem.py
-
-# 步骤2: OSM 获取长江 → IDW 插值 → REM 生成
-python 02_make_rem.py
-
-# 步骤3: Dan Coe 风格伪彩色渲染 (电光蓝)
-python 03_visualize_dancoe.py
-```
-
-成果自动输出到 `output/` 目录：
-- `rem_visualization.png` —— 高清 PNG (直接观赏)
-- `rem_visualization.tif` —— 带地理坐标 GeoTIFF (可在 QGIS 继续处理)
-- `rem.tif` —— 原始 REM 浮点栅格 (科研用)
-
-### 切换配色
+### 3. Run the pipeline
 
 ```bash
-python 03_visualize_dancoe.py --cmap magenta_glow   # 玫红辉光
-python 03_visualize_dancoe.py --cmap gold_ember     # 金琥珀色
-python 03_visualize_dancoe.py --cmap cyan_neon      # 青色霓虹
+python 01_download_dem.py        # Merge 6 tiles → UTM Zone 49N projection
+python 02_make_rem.py            # OSM Yangtze centerline → IDW interpolation → REM
+python 03_visualize_dancoe.py    # Dan Coe-style rendering
+```
+
+Or use the **experimental script** (GDAL `gdal_grid` IDW, potentially more accurate):
+
+```bash
+conda create -n rem_env riverrem -c conda-forge -y
+conda run -n rem_env python generate_jingjiang.py
+```
+
+### 4. Switch color schemes
+
+```bash
+python 03_visualize_dancoe.py --cmap magenta_glow   # Magenta glow
+python 03_visualize_dancoe.py --cmap gold_ember     # Gold ember
+python 03_visualize_dancoe.py --cmap cyan_neon      # Cyan neon
+python 03_visualize_dancoe.py --cmap ocean_depth    # Ocean depth
+python 03_visualize_dancoe.py --cmap volcanic_red   # Volcanic red
 ```
 
 ---
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```
-jingjiang-rem/
-├── config.py              # 🔧 全局参数 (范围/配色/采样间距)
-├── 01_download_dem.py     # 步骤1: DEM 预处理
-├── 02_make_rem.py       # 步骤2: REM 自动生成 (OSM + IDW + scipy cKDTree)
-├── 03_visualize_dancoe.py # 步骤3: 伪彩色渲染
-├── requirements.txt       # Python 依赖
-├── README.md            # 本文档 (快速入门)
-├── TUTORIAL.md          # 📖 详细教程 (数据获取/参数调优/故障排查)
-├── data/                # 自动创建 (存放输入 DEM)
-└── output/              # 自动创建 (存放输出成果)
+jingjiang-dancoe-rem/
+├── config.py                 # 🔧 All tunable parameters (bbox, sampling, IDW, colormaps)
+├── 01_download_dem.py        # Step 1: Merge ASTER tiles + crop + reproject to UTM 49N
+├── 02_make_rem.py            # Step 2: OSM Yangtze centerline + KDTree IDW + REM
+├── 03_visualize_dancoe.py    # Step 3: 6 color schemes + Hillshade + vignette post-processing
+├── generate_jingjiang.py     # [Experimental] gdal_grid IDW high-precision version
+├── requirements.txt          # Python dependencies
+├── README.md                 # This document
+├── TUTORIAL.md               # 📖 Full Chinese walkthrough (data download, tuning, troubleshooting)
+├── data/                     # (auto-created) DEM input tiles
+└── output/                   # (auto-created) REM rasters + rendered PNG/TIF
 ```
 
 ---
 
-## 🔬 技术亮点
+## 🗺️ Core Algorithm
 
-| 特性 | 说明 |
-|------|------|
-| **全自动 OSM 河流提取** | 无需手动绘制中心线，`osmnx` 自动从 OpenStreetMap 下载并筛选长江主河道 |
-| **纯 NumPy/SciPy IDW** | 不依赖 QGIS/ArcGIS 插值工具，`cKDTree` 分块处理大规模栅格 |
-| **米级 UTM 投影** | 全程使用 UTM Zone 49N (EPSG:32649)，确保插值距离单位为真实米 |
-| **距离裁剪** | 自动将超出河流 25km 范围的像素设为 NoData，保证 "夜光" 效果纯净 |
-| **自定义色带引擎** | 内置 6 套 Dan Coe 风格配色 (电光蓝、玫红、琥珀、青霓虹等) |
-| **GeoTIFF + PNG 双输出** | 同时输出带坐标的 GIS 栅格和可直接发社交媒体的高清图 |
-
----
-
-## 📖 详细教程
-
-- **环境搭建**、**数据获取详细步骤**、**参数调优指南**、**常见问题排错** 请参阅：[TUTORIAL.md](./TUTORIAL.md)
-
----
-
-## 📄 许可
-
-本项目脚本采用 **MIT License**。
-DEM 数据请遵守原始数据源许可（如 ASTER GDEM 由 METI/NASA 提供，免费使用）。
-OpenStreetMap 数据遵循 [ODbL](https://opendatacommons.org/licenses/odbl/)。
-
----
-
-## 🙏 致谢
-
-- **Dan Coe** —— REM 可视化方法的创造者，启发了本项目所有艺术风格
-- **Kenneth Larrieu** —— [RiverREM](https://github.com/klarrieu/RiverREM) Python 包，验证了全自动 REM 的可行性
-- **OpenStreetMap 贡献者** —— 提供了全球免费河流数据
+```
+ASTER Tiles (6 × 30m)               OpenStreetMap
+        │                                │
+        ▼                                ▼
+  gdalwarp merge + reproject       osmnx filter Yangtze mainstem
+        │                                │
+        ▼                                ▼
+   UTM 49N DEM          ──────────  River centerline (155 km)
+   (8118×5629 px)                   1,035 sample points
+        │                                │
+        ├────────  IDW Interpolation ────┘
+        │          scipy.cKDTree / gdal_grid
+        ▼
+  River surface raster (interpolated water elevation per pixel)
+        │
+        ▼
+  REM = DEM − River Surface  (channel = 0, floodplain > 0)
+        │
+        ▼
+  Custom 7-stop colormap  (0m = pure white → 5m = electric blue → 10m → pure black)
+  + GDAL Hillshade soft-light blend (15%)
+  + Vignette + gamma correction + sharpening
+        │
+        ▼
+  8118×5629 px PNG + GeoTIFF (georeferenced)
+```
 
 ---
 
-**欢迎提 Issue / PR / 分享你的荆江地图！** 🗺️
+## 🔬 Technical Highlights
+
+| Feature | Description |
+|---------|-------------|
+| **Automated OSM centerline** | `osmnx` downloads `waterway=river` segments and filters those named "长江 / Yangtze" |
+| **Dual IDW implementations** | `02_make_rem.py`: pure NumPy/SciPy cKDTree block-based; `generate_jingjiang.py`: GDAL `gdal_grid` (more robust) |
+| **Metric UTM projection** | UTM Zone 49N (EPSG:32649), true-meter interpolation distances |
+| **No hard cutoff** | All valid DEM pixels participate in REM; colormap naturally fades distant terrain to black |
+| **6 colormap schemes** | electric_blue, magenta_glow, gold_ember, cyan_neon, ocean_depth, volcanic_red |
+| **Dual output format** | High-res PNG (ready to view) + georeferenced GeoTIFF (overlay in QGIS on satellite imagery) |
+
+---
+
+## ⚙️ Configuration (`config.py`)
+
+```python
+# Jingjiang extent (WGS84)
+BBOX_WGS84 = {'west': 111.0, 'south': 29.0, 'east': 113.5, 'north': 30.5}
+
+# IDW parameters
+RIVER_SAMPLE_SPACING = 150.0   # Point spacing along river (meters)
+IDW_K_NEIGHBORS      = 12      # Nearest neighbors for interpolation
+IDW_POWER            = 2.0     # Inverse-distance exponent (2 = inverse-square)
+
+# Visualization
+VIZ_MAX = 10                   # Colormap ceiling (meters); above this → pure black
+VIZ_CMAP = 'electric_blue'     # Default color scheme
+```
+
+**Pro tip:** decrease `VIZ_MAX` to 4–6 for extreme high-contrast "ghost channel" mode; increase to 20+ for gentler terrain gradients.
+
+---
+
+## 📖 Full Tutorial
+
+See [TUTORIAL.md](./TUTORIAL.md) for a comprehensive Chinese-language guide covering:
+- GDAL installation (macOS / Ubuntu / Windows)
+- Step-by-step Geospatial Data Cloud download walkthrough
+- Parameter tuning (different river reaches / DEM resolutions)
+- Troubleshooting (OSM network issues, memory limits, GDAL version conflicts)
+
+---
+
+## 🙏 Acknowledgments
+
+- **Dan Coe** — Creator of REM visualization, [dancoecarto.com](https://dancoecarto.com)
+- **[RiverREM](https://github.com/OpenTopography/RiverREM)** (Kenneth Larrieu / OpenTopography) — Automated REM Python package
+- **OpenStreetMap** — Global free river vector data
+- **ASTER GDEM** — METI/NASA joint 30m global DEM
+
+---
+
+## 📄 License
+
+Code: **MIT License**. DEM data: copyright belongs to original providers (ASTER GDEM: METI/NASA). OSM data: [ODbL](https://opendatacommons.org/licenses/odbl/).
