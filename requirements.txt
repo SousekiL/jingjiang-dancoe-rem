@@ -1,0 +1,67 @@
+# 荆江段 REM 可视化项目 — Python 依赖
+# 安装方式 (推荐用 conda):
+#   conda create -n jingjiang python=3.11
+#   conda activate jingjiang
+#   pip install -r requirements.txt
+#
+# 或者使用 pip 虚拟环境:
+#   python -m venv venv
+#   source venv/bin/activate  (macOS/Linux)
+#   venv\Scripts\activate    (Windows)
+#   pip install -r requirements.txt
+
+# ==================== 核心地理/栅格处理 ====================
+
+# 栅格读写、地理坐标
+rasterio>=1.3.0
+
+# 投影转换
+pyproj>=3.4.0
+
+# GDAL Python 绑定 (用于生成山体阴影、栅格运算)
+osgeo4w ; platform_system=='Windows'
+
+# ==================== 矢量/OSM 处理 ====================
+
+# OpenStreetMap 数据下载与网络分析
+osmnx>=1.6.0
+
+# GeoDataFrame、矢量几何操作
+geopandas>=0.14.0
+
+# 底层几何引擎 (shapely 2.0 大幅提升了 linemerge/interpolate 性能)
+shapely>=2.0.0
+
+# ==================== 数值计算 ====================
+
+# 数组运算
+numpy>=1.24.0
+
+# KDTree 与 IDW 插值
+scipy>=1.10.0
+
+# 可 xarray + datashader 可选扩展 (本项目用纯 numpy + scipy 已实现)
+# xarray>=2023.01.0
+# rioxarray>=0.14.0
+# datashader>=0.14.0
+
+# ==================== 可视化和图片输出 ====================
+
+# matplotlib (色带、图例)
+matplotlib>=3.7.0
+
+# Pillow (高效 PNG 保存，比 matplotlib.imsave 更快)
+Pillow>=9.5.0
+
+# ==================== 辅助工具 ====================
+
+# 进度条 (用于 REM 分块处理)
+tqdm>=4.65.0
+
+# 按需安装 elevation (自动下载 SRTM，国内访问不稳定)
+# elevation>=1.1.0
+
+# ==================== 可选依赖 (进阶) ====================
+# (如果需要更高级的色彩科学或 3D 可视化)  
+# colorcet>=3.0.0
+# jupyterlab>=4.0.0

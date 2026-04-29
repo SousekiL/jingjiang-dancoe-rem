@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# GDAL / GIS temp files
+*.tif.aux.xml
+*.tif.ovr
+*.tfw
+*.wld
+*.prj
+*.shp.xml
+*.lock
+*.gpkg-wal
+*.gpkg-shm
+*.dbf
+*.shx
+
+# OS temp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data (DEM tiles) and output (large generated files)
+data/
+output/
+.cache/
+cache/
+spool/
