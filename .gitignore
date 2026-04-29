@@ -58,9 +58,9 @@ Thumbs.db
 *.swo
 *~
 
-# Data (DEM tiles) and output (large generated files)
+# Data and output (large generated files, not for git)
 data/
 output/
-.cache/
 cache/
-spool/
+*.img
+*.vrt
