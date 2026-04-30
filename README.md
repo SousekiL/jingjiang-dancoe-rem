@@ -34,6 +34,18 @@ python src/02_make_rem.py            # OSM Yangtze centerline → IDW interpolat
 python src/03_visualize_dancoe.py    # Dan Coe-style rendering
 ```
 
+More stable mainstem selection + debug exports (recommended when OSM includes many tributaries):
+
+```bash
+python src/02_make_rem.py --export-debug
+```
+
+Samplecases-aligned glow preset:
+
+```bash
+python src/03_visualize_dancoe.py --preset samplecases_blue_v1
+```
+
 Or use the **experimental script** (GDAL `gdal_grid` IDW, potentially more accurate):
 
 ```bash

@@ -75,6 +75,81 @@ VIZ_MAX = 10
 # 可选: 'electric_blue' | 'cyan_neon' | 'magenta_glow' | 'gold_ember'
 VIZ_CMAP = 'electric_blue'
 
+# ==================== 4b. 风格预设 (samplecases 对齐) ====================
+#
+# 说明：
+# - 该预设主要服务于 03_visualize_dancoe.py 的 tone mapping / bloom / 亮芯效果
+# - 不影响 REM 生成流程
+STYLE_PRESET = "default"  # 可选: "default" | "samplecases_blue_v1"
+
+STYLE_PRESETS = {
+    "default": {
+        "tone_percentile": None,        # None 表示沿用 VIZ_MAX
+        "tone_vmax_cap_factor": 8.0,
+        "tone_gamma": 1.15,
+        "background": "black",          # "black" | "white"
+        "alpha_power": 1.0,             # 仅 white 背景使用：alpha = (1-normalized)^alpha_power
+        "bloom_enabled": False,
+        "bloom_sigmas_px": (2.0, 6.0, 14.0),
+        "bloom_weights": (0.55, 0.30, 0.15),
+        "bloom_strength": 0.0,
+        "core_width_m": 0.6,            # rem<=core_width 的亮芯增强范围 (米)
+        "core_strength": 0.0,
+        "mainstem_enabled": False,
+        "mainstem_width_m": 1200.0,
+        "mainstem_color": "#003a7a",
+        "mainstem_alpha": 0.0,
+        "mainstem_glow_strength": 0.0,
+        "shade_strength": 0.35,         # hillshade 影响强度 (越大越立体也越脏)
+        "vignette_strength": 0.28,
+    },
+    "samplecases_blue_v1": {
+        "tone_percentile": 99.5,        # 自动估计上限：更接近 samplecases 的暗部层次
+        "tone_vmax_cap_factor": 6.0,    # 防止大范围高地把 vmax 拉得过高
+        "tone_gamma": 1.08,
+        "background": "black",
+        "alpha_power": 1.0,
+        "bloom_enabled": True,
+        "bloom_sigmas_px": (2.0, 7.0, 16.0),
+        "bloom_weights": (0.60, 0.28, 0.12),
+        "bloom_strength": 0.85,
+        "core_width_m": 0.8,
+        "core_strength": 1.0,
+        "mainstem_enabled": False,
+        "mainstem_width_m": 1400.0,
+        "mainstem_color": "#00c7ff",
+        "mainstem_alpha": 0.0,
+        "mainstem_glow_strength": 0.0,
+        "shade_strength": 0.28,
+        "vignette_strength": 0.30,
+    },
+    "samplecases_green_v1": {
+        "tone_percentile": 99.2,
+        "tone_vmax_cap_factor": 4.0,
+        "tone_gamma": 1.02,
+        "background": "white",
+        "alpha_power": 1.35,
+        "bloom_enabled": True,
+        "bloom_sigmas_px": (1.8, 6.0, 14.0),
+        "bloom_weights": (0.62, 0.26, 0.12),
+        "bloom_strength": 0.55,
+        "core_width_m": 1.1,
+        "core_strength": 0.55,
+        "mainstem_enabled": True,
+        "mainstem_width_m": 2200.0,
+        "mainstem_color": "#003b6f",
+        "mainstem_alpha": 0.92,
+        "mainstem_glow_strength": 0.35,
+        "streams_enabled": True,
+        "streams_width_m": 380.0,
+        "streams_color": "#2aa36b",
+        "streams_alpha": 0.22,
+        "streams_glow_strength": 0.10,
+        "shade_strength": 0.0,
+        "vignette_strength": 0.0,
+    },
+}
+
 
 # ==================== 5. 路径配置 ====================
 

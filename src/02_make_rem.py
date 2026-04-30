@@ -23,6 +23,7 @@
 import os
 import sys
 import warnings
+import re
 import numpy as np
 from tqdm import tqdm
 import rasterio
@@ -35,6 +36,133 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import *
 
 warnings.filterwarnings('ignore', category=FutureWarning)
+
+DEFAULT_RIVER_NAME_REGEX = r"(长江|Yangtze|扬子江)"
+
+
+def _extract_name_series(gdf):
+    """尽可能从 OSM 属性里提取名称列，用于正则匹配。"""
+    for col in ("name", "name:en", "alt_name", "official_name", "short_name"):
+        if col in gdf.columns:
+            return gdf[col].astype(str).fillna("")
+    return gdf.index.to_series().astype(str).fillna("")
+
+
+def _lines_only_gdf(gdf):
+    gdf = gdf.reset_index(drop=False).copy()
+    gdf = gdf[gdf.geometry.notna()].copy()
+    gdf = gdf[gdf.geom_type.isin(["LineString", "MultiLineString"])].copy()
+    return gdf
+
+
+def _seed_point_wgs84(bbox_wgs84, seed_lon_lat):
+    if seed_lon_lat is not None:
+        lon, lat = seed_lon_lat
+        return Point(float(lon), float(lat))
+    w, s, e, n = bbox_wgs84
+    return Point((w + e) / 2.0, (s + n) / 2.0)
+
+
+def _build_connectivity(geoms_utm, connect_tol_m):
+    """
+    在 UTM 平面上用端点距离判断线段连通性，返回邻接表。
+    """
+    endpoints = []
+    for i, geom in enumerate(geoms_utm):
+        if geom is None or geom.is_empty:
+            endpoints.append((i, None, None))
+            continue
+        if geom.geom_type == "MultiLineString":
+            parts = list(geom.geoms)
+            parts.sort(key=lambda g: g.length, reverse=True)
+            g = parts[0]
+        else:
+            g = geom
+        coords = list(g.coords)
+        endpoints.append((i, Point(coords[0]), Point(coords[-1])))
+
+    adj = {i: set() for i in range(len(geoms_utm))}
+    for i, a0, a1 in endpoints:
+        if a0 is None:
+            continue
+        for j, b0, b1 in endpoints[i + 1 :]:
+            if b0 is None:
+                continue
+            if (
+                a0.distance(b0) <= connect_tol_m
+                or a0.distance(b1) <= connect_tol_m
+                or a1.distance(b0) <= connect_tol_m
+                or a1.distance(b1) <= connect_tol_m
+            ):
+                adj[i].add(j)
+                adj[j].add(i)
+    return adj
+
+
+def _select_main_river_segments(gdf_4326, bbox_wgs84, river_name_regex, seed_lon_lat, connect_tol_m):
+    """
+    从 bbox 范围内的 OSM 河流线段中选择“主河道”：
+    1) 名称正则优先作为种子
+    2) 否则使用 bbox 中心点 (或 --seed) 就近锁定
+    3) 通过端点连通性扩展，聚合断裂线段
+    返回: (selected_gdf_4326, candidates_gdf_4326, seed_point_4326)
+    """
+    candidates = _lines_only_gdf(gdf_4326)
+    if candidates.empty:
+        print("[ERROR] OSM 数据中没有 LineString 类型的河流要素。")
+        sys.exit(1)
+
+    seed_pt_4326 = _seed_point_wgs84(bbox_wgs84, seed_lon_lat)
+    name_series = _extract_name_series(candidates)
+    name_mask = name_series.str.contains(river_name_regex, flags=re.IGNORECASE, regex=True, na=False)
+
+    candidates_utm = candidates.to_crs(UTM_CRS)
+    seed_pt_utm = gpd.GeoDataFrame(geometry=[seed_pt_4326], crs="EPSG:4326").to_crs(UTM_CRS).geometry.iloc[0]
+
+    if bool(name_mask.any()):
+        start_indices = list(np.where(name_mask.to_numpy())[0])
+        print(f"[OK] 名称正则命中 {len(start_indices)} 条河道段，将以此为主河道种子。")
+    else:
+        dists = candidates_utm.geometry.distance(seed_pt_utm)
+        nearest_pos = int(np.argmin(dists.to_numpy()))
+        start_indices = [nearest_pos]
+        print("[WARN] 未命中河流名称正则，将使用 bbox 中心点就近锁定主河道。")
+
+    adj = _build_connectivity(list(candidates_utm.geometry), connect_tol_m=float(connect_tol_m))
+
+    selected = set()
+    queue = list(start_indices)
+    while queue:
+        i = queue.pop()
+        if i in selected:
+            continue
+        selected.add(i)
+        for j in adj.get(i, ()):
+            if j not in selected:
+                queue.append(j)
+
+    selected_gdf = candidates.iloc[sorted(selected)].copy()
+
+    # 名称命中但集合太小，尝试用“就近连通集合”兜底
+    if bool(name_mask.any()) and len(selected_gdf) < 3:
+        dists = candidates_utm.geometry.distance(seed_pt_utm)
+        nearest_pos = int(np.argmin(dists.to_numpy()))
+        selected2 = set()
+        queue = [nearest_pos]
+        while queue:
+            i = queue.pop()
+            if i in selected2:
+                continue
+            selected2.add(i)
+            for j in adj.get(i, ()):
+                if j not in selected2:
+                    queue.append(j)
+        gdf2 = candidates.iloc[sorted(selected2)].copy()
+        if len(gdf2) > len(selected_gdf):
+            selected_gdf = gdf2
+            print("[INFO] 名称命中集合过小，已改用就近连通集合。")
+
+    return selected_gdf[["geometry"]], candidates[["geometry"]], seed_pt_4326
 
 
 def _get_river_from_osm(bbox_wgs84):
@@ -54,7 +182,7 @@ def _get_river_from_osm(bbox_wgs84):
 
     w, s, e, n = bbox_wgs84
     print(f"[OSM] 正在查询 OpenStreetMap (范围: {w:.2f},{s:.2f} ~ {e:.2f},{n:.2f})...")
-    print("      标签: waterway=river, 筛选主河道...")
+    print("      标签: waterway=river, 拉取河流线段...")
 
     polygon = box(w, s, e, n)
 
@@ -78,32 +206,7 @@ def _get_river_from_osm(bbox_wgs84):
         print("          - 或改用方案 B: 在 QGIS 中手动绘制河流中心线并导出为 river_line.geojson")
         sys.exit(1)
 
-    # 筛选主河道: 名字包含 长江 / Yangtze / 扬子江
-    if 'name' in gdf.columns:
-        name_series = gdf['name'].astype(str).fillna('')
-        mask_main = name_series.str.contains('长江', case=False) | \
-                    name_series.str.contains('Yangtze', case=False) | \
-                    name_series.str.contains('扬子江', case=False)
-    else:
-        mask_main = gdf.index.get_level_values(0).astype(str).str.contains('way', case=False)
-
-    if mask_main.any():
-        river_gdf = gdf[mask_main].copy()
-        print(f"[OK] 成功筛选到 {len(river_gdf)} 条主河道段(含长江)。")
-    else:
-        #  Fallback: 取长度最长的线要素作为主河道
-        print("[WARN] 未找到明确标记为'长江'的河道，将自动选择最长的河流线。")
-        line_gdf = gdf[gdf.geom_type.isin(['LineString', 'MultiLineString'])].copy()
-        if line_gdf.empty:
-            print("[ERROR] OSM 数据中没有 LineString 类型的河流要素。")
-            sys.exit(1)
-        line_gdf['length'] = line_gdf.to_crs(UTM_CRS).geometry.length
-        longest_idx = line_gdf['length'].idxmax()
-        river_gdf = line_gdf.loc[[longest_idx]].copy()
-
-    # 统一转为 LineString / MultiLineString，过滤掉多边形
-    river_gdf = river_gdf[river_gdf.geom_type.isin(['LineString', 'MultiLineString'])]
-    return river_gdf[['geometry']]
+    return gdf
 
 
 def _merge_and_project_river(river_gdf_4326):
@@ -290,12 +393,39 @@ def _idw_interpolate(river_pts, dem_path, output_path):
     print(f"[OK]   REM 生成完成 -> {output_path}")
 
 
-def _save_river_geojson_for_reference(line_utm):
-    """将主河道线保存为参考 GeoJSON (可选)。"""
-    ref_path = os.path.join(DATA_DIR, "river_line_reference.geojson")
-    gdf = gpd.GeoDataFrame(geometry=[line_utm], crs=UTM_CRS)
-    gdf.to_file(ref_path, driver='GeoJSON')
-    print(f"[INFO] 参考河道线已保存: {ref_path}")
+def _save_river_geojson_for_reference(line_utm, seed_pt_4326=None, export_debug=False, candidates_4326=None):
+    """将主河道线保存为参考 GeoJSON（可选输出候选线段用于调试）。"""
+    ref_utm = os.path.join(DATA_DIR, "river_line_reference_utm.geojson")
+    gdf_utm = gpd.GeoDataFrame(geometry=[line_utm], crs=UTM_CRS)
+    gdf_utm.to_file(ref_utm, driver="GeoJSON")
+    print(f"[INFO] 参考河道线已保存: {ref_utm}")
+
+    ref_wgs84 = os.path.join(DATA_DIR, "river_line_reference_wgs84.geojson")
+    gdf_wgs84 = gdf_utm.to_crs("EPSG:4326")
+    gdf_wgs84.to_file(ref_wgs84, driver="GeoJSON")
+    print(f"[INFO] 参考河道线已保存: {ref_wgs84}")
+
+    if export_debug and seed_pt_4326 is not None:
+        seed_path = os.path.join(DATA_DIR, "river_seed_point_wgs84.geojson")
+        gpd.GeoDataFrame(geometry=[seed_pt_4326], crs="EPSG:4326").to_file(seed_path, driver="GeoJSON")
+        print(f"[INFO] 种子点已保存: {seed_path}")
+
+    if export_debug and candidates_4326 is not None and not candidates_4326.empty:
+        cand_path = os.path.join(DATA_DIR, "river_candidates_wgs84.geojson")
+        candidates_4326.to_file(cand_path, driver="GeoJSON")
+        print(f"[INFO] 候选河道段已保存: {cand_path}")
+
+
+def _save_selected_segments(selected_4326, export_debug=False):
+    if not export_debug or selected_4326 is None or selected_4326.empty:
+        return
+    main_wgs84 = os.path.join(DATA_DIR, "river_mainstem_segments_wgs84.geojson")
+    selected_4326.to_file(main_wgs84, driver="GeoJSON")
+    print(f"[INFO] 主河道线段已保存: {main_wgs84}")
+
+    main_utm = os.path.join(DATA_DIR, "river_mainstem_segments_utm.geojson")
+    selected_4326.to_crs(UTM_CRS).to_file(main_utm, driver="GeoJSON")
+    print(f"[INFO] 主河道线段已保存: {main_utm}")
 
 
 def main():
@@ -303,26 +433,54 @@ def main():
     print("步骤 2/3: 生成 Relative Elevation Model (REM)")
     print("=" * 70)
 
+    import argparse
+    ap = argparse.ArgumentParser(description="生成 Relative Elevation Model (REM)")
+    ap.add_argument("--seed", nargs=2, type=float, metavar=("LON", "LAT"),
+                    help="种子点经纬度，用于锁定主河道（默认 bbox 中心点）")
+    ap.add_argument("--river-name-regex", type=str, default=DEFAULT_RIVER_NAME_REGEX,
+                    help=f"主河道名称正则（默认: {DEFAULT_RIVER_NAME_REGEX}）")
+    ap.add_argument("--connect-tol-m", type=float, default=600.0,
+                    help="河道段端点连通阈值（米），用于聚合断裂线段")
+    ap.add_argument("--export-debug", action="store_true",
+                    help="导出候选河道/种子点等调试 GeoJSON")
+    ap.add_argument("--force", action="store_true",
+                    help="即使 REM 已存在也强制重算")
+    args = ap.parse_args()
+
     if not os.path.exists(DEM_PROJ):
         print(f"[ERROR] 未找到 DEM 数据: {DEM_PROJ}")
         print("        请先运行: python 01_download_dem.py")
         sys.exit(1)
 
-    if os.path.exists(REM_TIF):
+    if os.path.exists(REM_TIF) and not args.force:
         print(f"[INFO] REM 文件已存在: {REM_TIF}")
-        print("       如需重新生成，请删除该文件再运行。")
+        print("       如需重新生成，请添加参数 --force 或删除该文件再运行。")
         return
 
     bbox = get_bbox()
 
     # 1. OSM 获取河流
-    river_gdf_4326 = _get_river_from_osm(bbox)
+    osm_gdf_4326 = _get_river_from_osm(bbox)
+    selected_river_4326, candidates_4326, seed_pt_4326 = _select_main_river_segments(
+        osm_gdf_4326,
+        bbox_wgs84=bbox,
+        river_name_regex=args.river_name_regex,
+        seed_lon_lat=args.seed,
+        connect_tol_m=float(args.connect_tol_m),
+    )
+    print(f"[OK] 选中主河道段数量: {len(selected_river_4326)}")
 
     # 2. 合并并投影
-    line_utm = _merge_and_project_river(river_gdf_4326)
+    line_utm = _merge_and_project_river(selected_river_4326)
 
     # 3. 保存参考
-    _save_river_geojson_for_reference(line_utm)
+    _save_river_geojson_for_reference(
+        line_utm,
+        seed_pt_4326=seed_pt_4326,
+        export_debug=bool(args.export_debug),
+        candidates_4326=candidates_4326 if args.export_debug else None,
+    )
+    _save_selected_segments(selected_river_4326, export_debug=bool(args.export_debug))
 
     # 4. 采样高程
     river_pts = _sample_river_elevations(line_utm, DEM_PROJ)
